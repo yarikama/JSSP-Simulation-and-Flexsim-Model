@@ -100,7 +100,7 @@ def transform_to_order(x):                                                 # 產
     return L
 
 def mkdir():                                                               # 創建新資料夾
-    current_path = os.path.dirname(os.path.abspath(__file__))              # 獲取當前.py文件的路徑
+    current_path = os.getcwd()              # 獲取當前.py文件的路徑
     new_folder_name = file_lname + "_solution"                                      # 新資料夾的名稱
     new_folder_path = os.path.join(current_path, new_folder_name)          # 新資料夾的完整路徑
     if not os.path.exists(new_folder_path):
@@ -325,17 +325,17 @@ def GA_solver(group_num, crossover_rate, mutation_rate):                   #GA�
        #print('iteration %d: x = %s, y = %d'	%(i, pop[0], -pop_fit[0]))     # fit 改負的
     #return best_outputs, mean_outputs, pop[0], -pop_fit[0]
     order_to_xlsx(pop[0], pop_fit[0])
-    if abs(pop_fit[0]) < abs(best_y):
-        best_y = pop_fit[0]
-        best_x = pop[0] 
+    if abs(pop_fit[0]) < abs(best_y[0]):
+        best_y = pop_fit
+        best_x = pop 
     return pop_fit[0]
 
 
-problem_path = input("請輸入檔案路徑：")
+problem_path = input("請輸入問題的資料夾路徑：")
 
 for file_name in iter_files(problem_path):   #主程式
     # ==== 參數設定(與問題相關) ====
-    best_y = 10000
+    best_y = [100000, 1000000]
     best_x = []
     file_list = readfile() 
     last_part = file_name.rsplit('/', 1)[-1]           # 這裡先取得 '/' 之後的所有字符
@@ -352,7 +352,7 @@ for file_name in iter_files(problem_path):   #主程式
 
     # ==== 參數設定(與演算法相關) ====
     GA_ITERATION = 0
-    NUM_ITERATION = 40                               # 世代數(迴圈數)
+    NUM_ITERATION = 300                               # 世代數(迴圈數)
     NUM_CHROME = 0                                    # 染色體個數
     Pc = 0.0                                          # 交配率 (代表共執行Pc*NUM_CHROME/2次交配)
     Pm = 0.0                                          # 突變率 (代表共要執行Pm*NUM_CHROME*NUM_BIT次突變)
@@ -365,15 +365,15 @@ for file_name in iter_files(problem_path):   #主程式
     optimizer = BayesianOptimization(
         f = GA_solver,
         pbounds = {
-            'group_num': (2, 10),                                 #約200最好
-            'crossover_rate': (0.00001, 0.99999),             #0.4~0.9最好
-            'mutation_rate': (0.00001, 0.99999),              #約在0.3最好
+            'group_num': (20, 260),                                 #約200最好
+            'crossover_rate': (0.48, 0.90),             #0.4~0.9最好
+            'mutation_rate': (0.00001, 0.2),              #約在0.3最好
         },
         random_state=0,
     )
     optimizer.maximize(
-        init_points = 2,
-        n_iter = 5,
+        init_points = 5,
+        n_iter = 20,
     )
     print(file_name)
     print(optimizer.max)
@@ -385,7 +385,7 @@ for file_name in iter_files(problem_path):   #主程式
         if choosen_one == first_four_chars:
             shutil.copy(solution_name, new_folder_path + "best_solution.xlsx")
             break
-    Start, Completion, Available, sol = fitFunc_2(best_x)
+    Start, Completion, Available, sol = fitFunc_2(best_x[0])
     SCB_xlsx(Start, Completion)
     Sequence_xlsx(Start)
     gantt(Start, Completion)
