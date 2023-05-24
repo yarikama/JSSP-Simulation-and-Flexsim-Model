@@ -8,7 +8,89 @@ import shutil
 from bayes_opt import BayesianOptimization
 
 
-# ==== 基因演算法會用到的函式 ====  
+# ==== 基因演算法會用到的函式 ====
+def fitFunc_2(x):                                                            # 適應度函數
+    S = np.zeros((NUM_JOB, NUM_MACHINE))    # S[i][j] = Starting time of job i at machine j
+    C = np.zeros((NUM_JOB, NUM_MACHINE))    # C[i][j] = Completion time of job i at machine j    
+    B = np.zeros(NUM_MACHINE, dtype=int)    # B[j] = Available time of machine j  
+    opJob = np.zeros(NUM_JOB, dtype=int)    # opJob[i] = current operation ID of job i
+    
+    for i in range(NUM_BIT):
+        m = mOrder[x[i]][opJob[x[i]]]
+        if opJob[x[i]] != 0:
+            S[x[i]][m] = max([B[m], C[x[i]][mOrder[x[i]][opJob[x[i]]-1]]])
+        else:
+            S[x[i]][m] = B[m]        
+        C[x[i]][m] = B[m] = S[x[i]][m] + pTime[x[i]][opJob[x[i]]]
+        opJob[x[i]] += 1
+    return S, C, B, -max(B)
+
+def SCB_xlsx(Start, Comp):
+    Total = []
+    L = []
+    for i in range(len(Start)):
+        Q = []
+        L.append("Job" + str(i+1))
+        for j in range(len(Start[i])):
+            Q.append(Start[i][j])
+            Q.append(Comp[i][j])
+        Total.append(Q)
+
+    Q = []
+    for j in range(len(Start[0])):
+        Q.append("StartTime_M" + str(j+1))
+        Q.append("CompletionTime_M" + str(j+1))
+
+    df = pd.DataFrame(Total)
+    df.index = L  # 设置行索引标签
+    df.columns = Q  # 设置列索引标签
+    with pd.ExcelWriter(new_folder_path +'best_solution.xlsx', mode='a') as writer:
+        df.to_excel(writer, sheet_name='Time')
+    
+def gantt(s, t):
+    fig, ax = plt.subplots(figsize=(10, 5)) #圖片大小
+    ax.set_ylim(0, len(s)) #y大小
+    
+    s = np.transpose(s)  # 將 start 轉置
+    t = np.transpose(t)  # 將 end 轉置
+    
+    for i in range(len(s)): #一條甘特圖
+        #start_times = data[i][::2]
+        #end_times = data[i][1::2]
+        start_nums = s[i]
+        end_nums = t[i]
+        for j in range(len(start_nums)): #一段時間段
+            start = start_nums[j]
+            end = end_nums[j]
+            ax.barh(i, end - start, left=start, height=0.9, align='center', alpha=0.8) #設定左右與長度
+            # ax.annotate(str(start), xy=(start, i), xytext=(start, i-0.15), ha='center', va='top') #標注起始時間
+            # ax.annotate(str(end), xy=(end, i), xytext=(end, i-0.15), ha='center', va='top') #標注結束時間
+
+    ax.set_yticks(range(len(s))) #x軸範圍
+    ax.set_yticklabels(['Machine{}'.format(i+1) for i in range(len(s))]) #job標注
+    ax.set_xlabel('Time')
+    plt.savefig(new_folder_path + "gantt.png")
+    #plt.show()
+
+def Sequence_xlsx(Start):
+    TStart = Start.T
+    Machine_order = []
+    Seq = []
+    Mac = []
+    x = 0
+    for i in range(len(TStart[0])):
+        Seq.append("Seq" + str(i+1))
+    for cards in TStart:
+        x = x+1
+        sorted_cards = [card[0] for card in sorted(enumerate(cards, 1), key=lambda x: x[1])]
+        Machine_order.append(sorted_cards)
+        Mac.append("Machine" + str(x))
+    df = pd.DataFrame(Machine_order)
+    df.index = Mac
+    df.columns = Seq   
+    with pd.ExcelWriter(new_folder_path +'best_solution.xlsx', mode='a') as writer:
+        df.to_excel(writer, sheet_name='Sequence')
+
 def transform_to_order(x):                                                 # 產生用在flexsim上的排程solution
     L = []
     for i in range(NUM_JOB):
@@ -98,7 +180,6 @@ def route_xlsx():                                                          # 用
   
 def initPop():                                                             # 初始化群體
     p = []
-    # === 編碼 000111222 的排列  ===
     for i in range(NUM_CHROME) :        
         a = []
         for j in range(NUM_JOB):
@@ -184,8 +265,10 @@ def crossover_uniform(p):                                                  # 用
         a.append(child2)
     return a
 
-def mutation(p):                                                           # 突變
+def mutation(p):                                                        # 突變
     for _ in range(NUM_MUTATION) :
+        if NUM_CROSSOVER_2 == 0: 
+            break
         row = np.random.randint(NUM_CROSSOVER_2)    # 任選一個染色體
         [j, k] = np.random.choice(NUM_BIT, 2, replace=False)  # 任選兩個基因
         p[row][j], p[row][k] = p[row][k], p[row][j]       # 此染色體的兩基因互換
@@ -211,11 +294,16 @@ def iter_files(directory):                                                 #找�
         yield os.path.join(directory, filename)
 
 def GA_solver(group_num, crossover_rate, mutation_rate):                   #GA演算法
-    global NUM_CHROME, Pc, Pm, GA_ITERATION
+    global NUM_CHROME, Pc, Pm, GA_ITERATION, NUM_PARENT, NUM_CROSSOVER, NUM_CROSSOVER_2, NUM_MUTATION, NUM_ITERATION, best_x, best_y
     GA_ITERATION = GA_ITERATION + 1
     NUM_CHROME = int(group_num)
     Pc = crossover_rate
     Pm = mutation_rate
+    NUM_PARENT = NUM_CHROME
+    NUM_CROSSOVER = int(Pc * NUM_CHROME / 2)          # 交配的次數
+    NUM_CROSSOVER_2 = NUM_CROSSOVER * 2               # 上數的兩倍
+    NUM_MUTATION = int(Pm * NUM_CHROME * NUM_BIT)     # 突變的次數# === Step 3-2. NUM_BIT 要修改成 3 x 3 ===
+    #print( Pc, Pm, GA_ITERATION, NUM_PARENT, NUM_CROSSOVER, NUM_CROSSOVER_2, NUM_MUTATION, NUM_ITERATION)
     # ==== 主程式 ==== 
     pop = initPop()                                 # 初始化 pop
     pop_fit = evaluatePop(pop)                      # 算 pop 的 fit
@@ -229,13 +317,17 @@ def GA_solver(group_num, crossover_rate, mutation_rate):                   #GA�
         offspring = crossover_one_point(parent)     # 單點交配
         mutation(offspring)                         # 突變
         offspring_fit = evaluatePop(offspring)      # 算子代的 fit
-        pop, pop_fit = replace(pop, pop_fit, offspring, offspring_fit)    # 取代
+        if NUM_CROSSOVER_2 != 0:
+            pop, pop_fit = replace(pop, pop_fit, offspring, offspring_fit)    # 取代
         best_outputs.append(np.max(pop_fit))        # 存下這次的最佳解
         mean_outputs.append(np.average(pop_fit))    # 存下這次的平均解
        #print('iteration %d: y = %d'	%(i, -pop_fit[0]))     # fit 改負的
        #print('iteration %d: x = %s, y = %d'	%(i, pop[0], -pop_fit[0]))     # fit 改負的
     #return best_outputs, mean_outputs, pop[0], -pop_fit[0]
-    order_to_xlsx(pop[0], pop_fit[0]) 
+    order_to_xlsx(pop[0], pop_fit[0])
+    if abs(pop_fit[0]) < abs(best_y):
+        best_y = pop_fit[0]
+        best_x = pop[0] 
     return pop_fit[0]
 
 
@@ -243,44 +335,49 @@ problem_path = input("請輸入檔案路徑：")
 
 for file_name in iter_files(problem_path):   #主程式
     # ==== 參數設定(與問題相關) ====
+    best_y = 10000
+    best_x = []
     file_list = readfile() 
     last_part = file_name.rsplit('/', 1)[-1]           # 這裡先取得 '/' 之後的所有字符
     file_lname = last_part.split('.')[0]               # 然後取得 '.' 之前的所有字符 
     new_folder_path = mkdir()              
     pTime = [[file_list[i][j] for j in range(len(file_list[i])) if j % 2 == 1] for i in range(1, len(file_list))]
     mOrder = [[file_list[i][j] for j in range(len(file_list[i])) if j % 2 == 0] for i in range(1, len(file_list))]
-    route_xlsx()    
+    route_xlsx()
+
+
     NUM_JOB = file_list[0][0]           
     NUM_MACHINE = file_list[0][1] 
+    NUM_BIT = NUM_JOB * NUM_MACHINE                   # 染色體長度 # === Step 3-1. 編碼是 000111222 的排列 ===
 
     # ==== 參數設定(與演算法相關) ====
     GA_ITERATION = 0
-    NUM_ITERATION = 450                                 # 世代數(迴圈數)
-    NUM_CHROME = 1000                                 # 染色體個數
-    NUM_BIT = NUM_JOB * NUM_MACHINE                   # 染色體長度 # === Step 3-1. 編碼是 000111222 的排列 ===
-    Pc = 0.5                                          # 交配率 (代表共執行Pc*NUM_CHROME/2次交配)
-    Pm = 0.01                                         # 突變率 (代表共要執行Pm*NUM_CHROME*NUM_BIT次突變)
-    NUM_PARENT = NUM_CHROME                           # 父母的個數
-    NUM_CROSSOVER = int(Pc * NUM_CHROME / 2)          # 交配的次數
-    NUM_CROSSOVER_2 = NUM_CROSSOVER*2                 # 上數的兩倍
-    NUM_MUTATION = int(Pm * NUM_CHROME * NUM_BIT)     # 突變的次數# === Step 3-2. NUM_BIT 要修改成 3 x 3 ===
+    NUM_ITERATION = 40                               # 世代數(迴圈數)
+    NUM_CHROME = 0                                    # 染色體個數
+    Pc = 0.0                                          # 交配率 (代表共執行Pc*NUM_CHROME/2次交配)
+    Pm = 0.0                                          # 突變率 (代表共要執行Pm*NUM_CHROME*NUM_BIT次突變)
+    NUM_PARENT = 0                                    # 父母的個數
+    NUM_CROSSOVER = 0                                 # 交配的次數
+    NUM_CROSSOVER_2 = 0                               # 上數的兩倍
+    NUM_MUTATION = 0                                  # 突變的次數 
     np.random.seed(0)                                 # 若要每次跑得都不一樣的結果，就把這行註解掉    
     
     optimizer = BayesianOptimization(
         f = GA_solver,
         pbounds = {
-            'group_num': (10, 230),                                 #約200最好
-            'crossover_rate': (0.000001, 0.9999999),             #0.4~0.9最好
-            'mutation_rate': (0.000001, 0.9999999),              #約在0.3最好
+            'group_num': (2, 10),                                 #約200最好
+            'crossover_rate': (0.00001, 0.99999),             #0.4~0.9最好
+            'mutation_rate': (0.00001, 0.99999),              #約在0.3最好
         },
         random_state=0,
     )
     optimizer.maximize(
-        init_points = 4,
-        n_iter = 1000,
+        init_points = 2,
+        n_iter = 5,
     )
     print(file_name)
     print(optimizer.max)
+    print(best_x, best_y)
     choosen_one = str(-1 * int(optimizer.max['target']))
     for solution_name in iter_files(new_folder_path):
         name = solution_name.split(".")[0]  # 拆分檔名，並取得 `.` 前面的部分
@@ -288,6 +385,12 @@ for file_name in iter_files(problem_path):   #主程式
         if choosen_one == first_four_chars:
             shutil.copy(solution_name, new_folder_path + "best_solution.xlsx")
             break
+    Start, Completion, Available, sol = fitFunc_2(best_x)
+    SCB_xlsx(Start, Completion)
+    Sequence_xlsx(Start)
+    gantt(Start, Completion)
+    
+    
     #best_outputs, mean_outputs, sol_x, sol_y = GA_solver(0.4, 0.7);
     #print(sol_x, sol_y, Pc, Pm)        
     # 畫圖
