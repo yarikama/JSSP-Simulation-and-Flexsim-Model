@@ -4,7 +4,7 @@
 
 JSSP為NP問題，適合以元啟發式演算法以較高效的方式近似找出較優解，而我們透過這學期修習的**基因演算法與管理科學**中獲得靈感，決定以基因演算法（Genetic Algorithm）並利用貝式優化（Bayesian Optimization）來解決這次的問題。
 
-[模擬學第三組期末簡報.pdf](Scheduling%20&%20Simulation%20316f6606e90d47aea70c77c3c5c4e70e/%25E6%25A8%25A1%25E6%2593%25AC%25E5%25AD%25B8%25E7%25AC%25AC%25E4%25B8%2589%25E7%25B5%2584%25E6%259C%259F%25E6%259C%25AB%25E7%25B0%25A1%25E5%25A0%25B1.pdf)
+[方法說明.pdf](簡報.pdf)
 
 # 演算法
 
@@ -101,4 +101,4 @@ GA 中設定的 iteration 要跑完才能有 sequence。若尚未跑出 best sol
 
 [rcmax_20_15_4_solution_160_result_2966.xlsx](Scheduling%20&%20Simulation%20316f6606e90d47aea70c77c3c5c4e70e/rcmax_20_15_4_solution_160_result_2966.xlsx)
 
-[模擬學第三組期末書面報告.pdf](Scheduling%20&%20Simulation%20316f6606e90d47aea70c77c3c5c4e70e/%25E6%25A8%25A1%25E6%2593%25AC%25E5%25AD%25B8%25E7%25AC%25AC%25E4%25B8%2589%25E7%25B5%2584%25E6%259C%259F%25E6%259C%25AB%25E6%259B%25B8%25E9%259D%25A2%25E5%25A0%25B1%25E5%2591%258A.pdf)
+[模擬學第三組期末書面報告.pdf](書面報告.pdf)
